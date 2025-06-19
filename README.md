@@ -3,6 +3,7 @@ A Python library for generating molecular graphs of small organic molecules from
 Input requires an Orca .out file, .xyz coordinates file, and .mp2nat file. Generates thermostatistical data via Shermo and natural population analysis via JANPA. 
 
 Citations: 
+
 Neese, F. et al. The ORCA quantum chemistry program package. J. Chem. Phys. 2020, 152, 224108
 
 Nikolaienko et al. JANPA: an open source cross-platform implementation of the Natural Population Analysis on the Java platform, Computational and Theoretical Chemistry 2014, 1050, 15-22, DOI: 10.1016/j.comptc.2014.10.002, http://janpa.sourceforge.net
