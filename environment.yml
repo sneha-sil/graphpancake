@@ -1,0 +1,35 @@
+name: graphpancake-env
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  # Base Python environment
+  - python>=3.8
+  - pip
+  
+  # Core dependencies (conda-forge when possible for better compatibility)
+  - pandas
+  - numpy
+  - rdkit
+  - networkx
+  - matplotlib
+  - pyyaml
+  - tqdm
+  - psutil
+  - regex
+  - plotly
+  
+  # PyTorch ecosystem (conda-forge)
+  - pytorch
+  - pyg  # PyTorch Geometric
+  
+  # Python version specific
+  - importlib-resources  # Only needed for Python <3.10
+  
+  # Development and build tools
+  - setuptools
+  - wheel
+  
+  # Install graphpancake from PyPI via pip
+  - pip:
+    - graphpancake

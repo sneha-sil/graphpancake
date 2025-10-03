@@ -15,7 +15,7 @@
 # Incase the project was not installed
 import os
 import sys
-sys.path.insert(0, os.path.abspath('..'))
+sys.path.insert(0, os.path.abspath('../src'))
 
 import graphpancake
 
@@ -23,8 +23,7 @@ import graphpancake
 # -- Project information -----------------------------------------------------
 
 project = 'graphpancake'
-copyright = ("2025, Sneha Sil. Project structure based on the "
-             "Computational Molecular Science Python Cookiecutter version 1.11")
+copyright = ("2025, Sneha Sil")
 author = 'Sneha Sil'
 
 # The short X.Y version
@@ -43,7 +42,7 @@ release = ''
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    'sphinx.ext.autosummary',
+    # 'sphinx.ext.autosummary',  # Temporarily disabled
     'sphinx.ext.autodoc',
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
@@ -55,7 +54,7 @@ extensions = [
 ]
 
 
-autosummary_generate = True
+# autosummary_generate = True  # Disabled
 napoleon_google_docstring = False
 napoleon_use_param = False
 napoleon_use_ivar = True
@@ -77,7 +76,7 @@ master_doc = 'index'
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = None
+language = 'en'
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
@@ -93,7 +92,7 @@ pygments_style = 'default'
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'pydata_sphinx_theme'
+html_theme = "shibuya"
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -105,6 +104,8 @@ html_theme = 'pydata_sphinx_theme'
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
+html_css_files = ['custom.css']
+
 
 # Custom sidebar templates, must be a dictionary that maps document names
 # to template names.

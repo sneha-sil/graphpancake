@@ -1,0 +1,129 @@
+/* CSS elements to take the Sphinx Shibuya theme and make the accent color dark red instead of purple */
+:root {
+  --violet-1: #1a0e0e !important;
+  --violet-2: #251515 !important;
+  --violet-3: #431717 !important;
+  --violet-4: #5b1111 !important;
+  --violet-5: #691616 !important;
+  --violet-6: #762020 !important;
+  --violet-7: #8b2d2d !important;
+  --violet-8: #ad3939 !important;
+  --violet-9: #8B0000 !important;
+  --violet-10: #9e0000 !important;
+  --violet-11: #ff7d7d !important;
+  --violet-12: #fbd3cb !important;
+  
+  --accent-1: #1a0e0e !important;
+  --accent-2: #251515 !important;
+  --accent-3: #431717 !important;
+  --accent-4: #5b1111 !important;
+  --accent-5: #691616 !important;
+  --accent-6: #762020 !important;
+  --accent-7: #8b2d2d !important;
+  --accent-8: #ad3939 !important;
+  --accent-9: #8B0000 !important;
+  --accent-10: #9e0000 !important;
+  --accent-11: #ff7d7d !important;
+  --accent-12: #fbd3cb !important;
+  
+  --violet-a1: #8B000008 !important;
+  --violet-a2: #8B00000f !important;
+  --violet-a3: #8B00002b !important;
+  --violet-a4: #8B000042 !important;
+  --violet-a5: #8B000053 !important;
+  --violet-a6: #8B000064 !important;
+  --violet-a7: #8B00007d !important;
+  --violet-a8: #8B0000a7 !important;
+  --violet-a9: #8B0000e4 !important;
+  --violet-a10: #8B0000eb !important;
+  --violet-a11: #ff7d7d !important;
+  --violet-a12: #fbd3cb !important;
+  
+  --accent-a1: #8B000008 !important;
+  --accent-a2: #8B00000f !important;
+  --accent-a3: #8B00002b !important;
+  --accent-a4: #8B000042 !important;
+  --accent-a5: #8B000053 !important;
+  --accent-a6: #8B000064 !important;
+  --accent-a7: #8B00007d !important;
+  --accent-a8: #8B0000a7 !important;
+  --accent-a9: #8B0000e4 !important;
+  --accent-a10: #8B0000eb !important;
+  --accent-a11: #ff7d7d !important;
+  --accent-a12: #fbd3cb !important;
+}
+
+html[data-accent-color="violet"] {
+  --violet-1: #1a0e0e !important;
+  --violet-2: #251515 !important;
+  --violet-3: #431717 !important;
+  --violet-4: #5b1111 !important;
+  --violet-5: #691616 !important;
+  --violet-6: #762020 !important;
+  --violet-7: #8b2d2d !important;
+  --violet-8: #ad3939 !important;
+  --violet-9: #8B0000 !important;
+  --violet-10: #9e0000 !important;
+  --violet-11: #ff7d7d !important;
+  --violet-12: #fbd3cb !important;
+  
+  --accent-1: #1a0e0e !important;
+  --accent-2: #251515 !important;
+  --accent-3: #431717 !important;
+  --accent-4: #5b1111 !important;
+  --accent-5: #691616 !important;
+  --accent-6: #762020 !important;
+  --accent-7: #8b2d2d !important;
+  --accent-8: #ad3939 !important;
+  --accent-9: #8B0000 !important;
+  --accent-10: #9e0000 !important;
+  --accent-11: #ff7d7d !important;
+  --accent-12: #fbd3cb !important;
+}
+
+.sd-btn-outline-primary {
+  border-color: #8B0000 !important;
+  color: #8B0000 !important;
+}
+
+.sd-btn-outline-primary:hover {
+  background-color: #8B0000 !important;
+  border-color: #8B0000 !important;
+  color: white !important;
+}
+
+a {
+  color: #8B0000 !important;
+}
+
+a:hover {
+  color: #A52A2A !important;
+}
+
+.globaltoc a,
+.localtoc a,
+.sy-head-brand,
+.sy-breadcrumbs a {
+  color: #8B0000 !important;
+}
+
+:root {
+  --accent-contrast: white !important;
+}
+
+.yue table th,
+.yue .table-wrapper th,
+.sd-table th {
+  background-color: #8B0000a7 !important;
+}
+
+.yue table,
+.yue .table-wrapper,
+.sd-table,
+.yue table td,
+.yue .table-wrapper td,
+.sd-table td {
+  border-color: inherit !important;
+  background-color: inherit !important;
+  color: inherit !important;
+}

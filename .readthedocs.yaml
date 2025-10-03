@@ -1,12 +1,32 @@
+# Read the Docs configuration file for GraphPancake
+# See https://docs.readthedocs.io/en/stable/config-file/v2.html for details
+
 version: 2
 
 build:
   os: "ubuntu-22.04"
   tools:
     python: "mambaforge-22.9"
+  jobs:
+    # Pre-build job to install build dependencies
+    pre_build:
+      - pip install --upgrade pip setuptools wheel
+      - pip install versioningit
 
+# Build documentation with Sphinx
 sphinx:
-   configuration: docs/conf.py
+  configuration: docs/conf.py
+  fail_on_warning: false
 
+# Use Conda for environment management
 conda:
   environment: docs/requirements.yaml
+
+# Python configuration
+python:
+  install:
+    # Install the package in development mode
+    - method: pip
+      path: .
+      extra_requirements:
+        - docs

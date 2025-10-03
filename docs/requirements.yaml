@@ -1,22 +1,43 @@
 name: docs_graphpancake
 channels:
-
   - conda-forge
-
   - defaults
+
 dependencies:
-    # Base depends
-  - python
+  # Base Python environment
+  - python>=3.8
   - pip
-  
+
+  # Sphinx and documentation dependencies
+  - sphinx>=4.0
   - pydata-sphinx-theme
   - sphinx-design
   - sphinx-copybutton
+  - sphinx-autoapi
+  - myst-parser
 
+  # Core Python dependencies from pyproject.toml
+  - pandas
+  - numpy
+  - torch
+  - torch-geometric
+  - networkx
+  - plotly
+  - matplotlib
+  - pyyaml
+  - rdkit
+  - regex
+  - tqdm
+  - psutil
+  - importlib-resources  # Only needed for Python <3.10
 
+  # Build tools
+  - setuptools
+  - wheel
+  - versioningit
 
-
-    # Pip-only installs
   - pip:
     - -e ../
+    # Optional/extra packages
+    - polars
 

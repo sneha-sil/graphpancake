@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 # https://packaging.python.org/en/latest/specifications/declaring-project-metadata/
 [project]
 name = "graphpancake"
-description = "A Python library for generating molecular graphs of small organic molecules from DFT and WFT calculations."
+description = "A Python library for generating molecular graphs of small organic molecules (elements H, B, C, N, O, F, Si, P, S, Cl, Br, I) from electronic structure theory (i.e., DFT and WFT quantum chemistry calculations)"
 dynamic = ["version"]
 readme = "README.md"
 authors = [
@@ -19,19 +19,37 @@ classifiers = [
     "Programming Language :: Python :: 3",
 ]
 requires-python = ">=3.8"
-# Declare any run-time dependencies that should be installed with the package.
-#dependencies = [
-#    "importlib-resources;python_version<'3.10'",
-#]
+dependencies = [
+    "pandas",
+    "numpy",
+    "torch",
+    "torch-geometric",
+    "networkx",
+    "plotly",
+    "matplotlib",
+    "pyyaml",
+    "rdkit",
+    "regex",
+    "tqdm",
+    "psutil",
+    "importlib-resources; python_version<'3.10'",
+]
 
 # Update the urls once the hosting is set up.
 #[project.urls]
-#"Source" = "https://github.com/<username>/graphpancake/"
+#"Source" = "https://github.com/sneha-sil/graphpancake/"
 #"Documentation" = "https://graphpancake.readthedocs.io/"
+
+[project.scripts]
+graphpancake = "graphpancake.cli:main"
 
 [project.optional-dependencies]
 test = [
   "pytest>=6.1.2",
+]
+docs = [
+  "sphinx",
+  "sphinx_rtd_theme",
 ]
 
 [tool.setuptools]
@@ -54,13 +72,17 @@ zip-safe = false
 # (instead of using 'find'). With 'find', the 'tests' subpackage is discovered
 # recursively because of its __init__.py file, but the data subdirectory is excluded
 # with include-package-data = false and namespaces = false.
+
+# SS: change to true when data files are added
 include-package-data = false
 [tool.setuptools.packages.find]
 namespaces = false
-where = ["."]
+where = ["src"]
 
 # Ref https://setuptools.pypa.io/en/latest/userguide/datafiles.html#package-data
 [tool.setuptools.package-data]
+
+# SS: edit when data files are added
 graphpancake = [
     "py.typed"
 ]
@@ -81,4 +103,4 @@ match = ["*"]
 default-tag = "1.0.0"
 
 [tool.versioningit.write]
-file = "graphpancake/_version.py"
+file = "src/graphpancake/_version.py"
