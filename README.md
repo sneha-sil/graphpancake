@@ -52,7 +52,7 @@ If the `graphpancake` command is not available, you can also use `python -m grap
 
 ---
 
-## Example: Batch processing of several molecules using scripts
+### Example: Batch processing of several molecules using scripts
 
 Batch processing works best when you have a folder or gzip file of hundreds or thousands of data files, with a corresponding CSV of identification names and SMILES strings. Examples are available in the auxiliary graphpancake_data.zip folder available in this repository. 
 
