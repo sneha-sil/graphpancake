@@ -1425,6 +1425,14 @@ def analyze_bond_orders(distance_matrix: np.ndarray, wiberg_matrix: np.ndarray =
         clean_bond_orders = [float(bo) if bo is not None else None for bo in filtered_bond_orders]
         
         return atom_i_indices[valid_mask].tolist(), atom_j_indices[valid_mask].tolist(), clean_distances, clean_bond_orders
+    else:
+        # No Wiberg matrix provided, only use distance filter
+        valid_mask = distance_mask
+        
+        filtered_distances = distances[valid_mask]
+        clean_distances = [float(d) for d in filtered_distances]
+        
+        return atom_i_indices[valid_mask].tolist(), atom_j_indices[valid_mask].tolist(), clean_distances, [None] * len(clean_distances)
 
 def get_dft_edges(distance_matrix, SMILES, num_atoms):
     """

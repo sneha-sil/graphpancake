@@ -224,8 +224,22 @@ class DictData:
                 lone_pair_occupancies.append(atom_lp_occ)
                 lone_pair_energies.append(atom_lp_en)
             
+            # For NBO graphs, Wiberg data is not available, so set to None
+            wiberg_totals = [None] * self.num_atoms
+            bound_h = [None] * self.num_atoms
+            node_deg = [None] * self.num_atoms
+            electron_pops = [None] * self.num_atoms
+            nmb_pops = [None] * self.num_atoms
+            npa_charges = [None] * self.num_atoms
+            
             # Convert nan arrays back to lists with None for compatibility
             node_data.update({
+                'wiberg_bond_order_totals': wiberg_totals,
+                'bound_hydrogens': bound_h,
+                'node_degrees': node_deg,
+                'electron_populations': electron_pops,
+                'nmb_populations': nmb_pops,
+                'npa_charges': npa_charges,
                 'natural_charges': [None if np.isnan(x) else x for x in natural_charges],
                 'core_populations': [None if np.isnan(x) else x for x in core_populations],
                 'valence_populations': [None if np.isnan(x) else x for x in valence_populations],
