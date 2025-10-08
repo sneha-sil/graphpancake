@@ -7,6 +7,7 @@ import pandas as pd
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 import logging
+import json
 
 # Optional imports for visualization and ML frameworks
 try:
@@ -31,8 +32,14 @@ except ImportError:
     HAS_POLARS = False
 
 # Configure logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+def json_wrapper(value):
+    """Convert dict, list, or tuple to JSON string for database storage."""
+    if isinstance(value, (dict, list, tuple)):
+        return json.dumps(value)
+    return value
 
 class MolecularGraph:
     
@@ -244,6 +251,8 @@ class MolecularGraph:
                         If None, creates schema supporting all types.
         """
         db_path = Path(db_path)
+        if not db_path.name.endswith('.db'):
+            db_path = db_path.with_suffix('.db')
         db_path.parent.mkdir(parents=True, exist_ok=True)
         
         if graph_types is None:
@@ -604,6 +613,15 @@ class MolecularGraph:
             edge_features = self.get_edge_features()
             target_features = self.get_target_features()
             
+            # Extract SMILES from labels data if available (should be stored in graphs table, not labels)
+            smiles_value = graph_features.get('smiles')
+            if hasattr(self, '_labels_data') and self._labels_data:
+                # Check for SMILES in labels data and use it for the graphs table
+                if 'SMILES' in self._labels_data:
+                    smiles_value = self._labels_data['SMILES']
+                elif 'smiles' in self._labels_data:
+                    smiles_value = self._labels_data['smiles']
+            
             # Insert graph-level data
             cursor.execute('''
                 INSERT OR REPLACE INTO graphs 
@@ -613,7 +631,7 @@ class MolecularGraph:
             ''', (
                 self.id,
                 graph_features.get('graph_type'),
-                graph_features.get('smiles'),
+                smiles_value,
                 graph_features.get('formula'),
                 graph_features.get('molecular_mass'),
                 graph_features.get('num_atoms'),
@@ -662,9 +680,9 @@ class MolecularGraph:
                 # Add graph-type specific features
                 if self._qm_data.graph_type in ["NPA", "QM"]:
                     node_data.extend([
-                        node.get('wiberg_bond_order_total'),
-                        node.get('bound_hydrogens'),
-                        node.get('node_degree')
+                        node.get(json_wrapper('wiberg_bond_order_total')),
+                        node.get(json_wrapper('bound_hydrogens')),
+                        node.get(json_wrapper('node_degree'))
                     ])
                 else:
                     node_data.extend([None, None, None])
@@ -844,6 +862,43 @@ class MolecularGraph:
             cursor.execute(f'''
                 INSERT OR REPLACE INTO targets VALUES ({placeholders})
             ''', target_data)
+            
+            # Insert labels data if available
+            if hasattr(self, '_labels_data') and self._labels_data:
+                logger.debug(f"Inserting labels for {self.id}: {self._labels_data}")
+                for label_name, label_value in self._labels_data.items():
+                    # Skip mol_id as it's the graph_id
+                    if label_name == 'mol_id':
+                        continue
+                    
+                    if label_name.lower() in ['smiles']:
+                        # logger.debug(f"Skipping SMILES column as it's not a label: {label_name}={label_value}")
+                        continue
+                    
+                    # Determine label type based on value
+                    numeric_value = None
+                    if isinstance(label_value, (int, float)):
+                        numeric_value = float(label_value)
+                        label_type = 'regression'
+                    else:
+                        # Try to convert string to numeric
+                        try:
+                            numeric_value = float(label_value)
+                            label_type = 'regression'
+                        except (ValueError, TypeError):
+                            # Not numeric, treat as classification
+                            label_type = 'classification'
+                            # For now, skip non-numeric labels
+                            logger.debug(f"Skipping non-numeric label {label_name}={label_value}")
+                            continue
+                    
+                    cursor.execute('''
+                        INSERT OR REPLACE INTO labels 
+                        (graph_id, label_name, label_value, label_type)
+                        VALUES (?, ?, ?, ?)
+                    ''', (self.id, label_name, numeric_value, label_type))
+            else:
+                logger.debug(f"No labels data for {self.id}: hasattr={hasattr(self, '_labels_data')}, data={getattr(self, '_labels_data', None)}")
             
             conn.commit()
             logger.info(f"\tSaved graph {self.id} ({self._qm_data.graph_type}) to database")

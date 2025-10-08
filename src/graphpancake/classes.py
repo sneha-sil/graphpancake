@@ -55,11 +55,11 @@ class DictData:
             'atom_labels': 'atom_labels',
             
             'polarizability': 'polarizability',
-            'moments_of_inertia': 'moments_of_inertia',
+            'moments_of_inertia': 'principal_moments',
             'rotational_constants': 'rotational_constants', 
             'rotational_temperatures': 'rotational_temperatures',
-            'heat_capacity_Cv': 'heat_capacity_Cv',
-            'heat_capacity_Cp': 'heat_capacity_Cp',
+            'heat_capacity_Cv': 'cv',
+            'heat_capacity_Cp': 'cp',
             'entropy': 'entropy',
             'ZPE': 'zpe',
             'electronic_energy': 'electronic_energy',
@@ -163,10 +163,15 @@ class DictData:
             else:
                 electron_pops = nmb_pops = npa_charges = [None] * self.num_atoms
                 
+            # Convert numpy arrays to Python lists to avoid binary storage
+            wiberg_totals = self.wiberg_bond_order_totals.tolist() if self.wiberg_bond_order_totals is not None else [None] * self.num_atoms
+            bound_h = self.bound_hydrogens.tolist() if self.bound_hydrogens is not None else [None] * self.num_atoms
+            node_deg = self.node_degrees.tolist() if self.node_degrees is not None else [None] * self.num_atoms
+                
             node_data.update({
-                'wiberg_bond_order_totals': self.wiberg_bond_order_totals,
-                'bound_hydrogens': self.bound_hydrogens,
-                'node_degrees': self.node_degrees,
+                'wiberg_bond_order_totals': wiberg_totals,
+                'bound_hydrogens': bound_h,
+                'node_degrees': node_deg,
                 'electron_populations': electron_pops,
                 'nmb_populations': nmb_pops,
                 'npa_charges': npa_charges,
@@ -281,11 +286,24 @@ class DictData:
                 lone_pair_occupancies.append(atom_lp_occ)
                 lone_pair_energies.append(atom_lp_en)
             
-            # Combine all QM features
+            # Combine all QM features including NPA charges
+            if self.natural_population_analysis_charges:
+                electron_pops, nmb_pops, npa_charges = extract_npa_charges(self.natural_population_analysis_charges)
+            else:
+                electron_pops = nmb_pops = npa_charges = [None] * self.num_atoms
+            
+            # Convert numpy arrays to Python lists to avoid binary storage
+            wiberg_totals = self.wiberg_bond_order_totals.tolist() if self.wiberg_bond_order_totals is not None else [None] * self.num_atoms
+            bound_h = self.bound_hydrogens.tolist() if self.bound_hydrogens is not None else [None] * self.num_atoms
+            node_deg = self.node_degrees.tolist() if self.node_degrees is not None else [None] * self.num_atoms
+            
             node_data.update({
-                'wiberg_bond_order_totals': self.wiberg_bond_order_totals,
-                'bound_hydrogens': self.bound_hydrogens,
-                'node_degrees': self.node_degrees,
+                'wiberg_bond_order_totals': wiberg_totals,
+                'bound_hydrogens': bound_h,
+                'node_degrees': node_deg,
+                'electron_populations': electron_pops,
+                'nmb_populations': nmb_pops,
+                'npa_charges': npa_charges,
                 'natural_charges': [None if np.isnan(x) else x for x in natural_charges],
                 'core_populations': [None if np.isnan(x) else x for x in core_populations],
                 'valence_populations': [None if np.isnan(x) else x for x in valence_populations],
@@ -596,6 +614,9 @@ class DictData:
                     'wiberg_bond_order_total': node_data.get('wiberg_bond_order_totals', [None])[i],
                     'bound_hydrogens': node_data.get('bound_hydrogens', [None])[i],
                     'node_degree': node_data.get('node_degrees', [None])[i],
+                    'electron_population': node_data.get('electron_populations', [None])[i],
+                    'nmb_population': node_data.get('nmb_populations', [None])[i],
+                    'npa_charge': node_data.get('npa_charges', [None])[i],
                 })
                 
             if self.graph_type in ["NBO", "QM"]:
@@ -889,14 +910,16 @@ class Node(GraphBase):
                     lone_pair_occ = node_data['lone_pair_occupancies'][i]
                     lone_pair_en = node_data['lone_pair_energies'][i]
                     
-                    if len(lone_pair_occ) == 2 and lone_pair_occ[0] is not None and lone_pair_occ[1] is None:
-                        node["lone_pair_occupancy"] = lone_pair_occ[0]
-                        node["lone_pair_energy"] = lone_pair_en[0]
-                    else:
-                        for j, (occ, en) in enumerate(zip(lone_pair_occ, lone_pair_en), 1):
-                            if occ is not None:
-                                node[f"lone_pair_{j}_occupancy"] = occ
-                                node[f"lone_pair_{j}_energy"] = en
+                    # Check that both lists exist and are not None before zip
+                    if lone_pair_occ is not None and lone_pair_en is not None:
+                        if len(lone_pair_occ) == 2 and lone_pair_occ[0] is not None and lone_pair_occ[1] is None:
+                            node["lone_pair_occupancy"] = lone_pair_occ[0]
+                            node["lone_pair_energy"] = lone_pair_en[0]
+                        else:
+                            for j, (occ, en) in enumerate(zip(lone_pair_occ, lone_pair_en), 1):
+                                if occ is not None:
+                                    node[f"lone_pair_{j}_occupancy"] = occ
+                                    node[f"lone_pair_{j}_energy"] = en
                 
             elif self.graph_type == "QM":
                 npa_features = self.qm_data.vectorized_extract_charges(node_data, [i], 'NPA')[0]
@@ -972,14 +995,16 @@ class Node(GraphBase):
                     lone_pair_occ = node_data['lone_pair_occupancies'][i]
                     lone_pair_en = node_data['lone_pair_energies'][i]
                     
-                    if len(lone_pair_occ) == 2 and lone_pair_occ[0] is not None and lone_pair_occ[1] is None:
-                        node["lone_pair_occupancy"] = lone_pair_occ[0]
-                        node["lone_pair_energy"] = lone_pair_en[0]
-                    else:
-                        for j, (occ, en) in enumerate(zip(lone_pair_occ, lone_pair_en), 1):
-                            if occ is not None:
-                                node[f"lone_pair_{j}_occupancy"] = occ
-                                node[f"lone_pair_{j}_energy"] = en
+                    # Check that both lists exist and are not None before zip
+                    if lone_pair_occ is not None and lone_pair_en is not None:
+                        if len(lone_pair_occ) == 2 and lone_pair_occ[0] is not None and lone_pair_occ[1] is None:
+                            node["lone_pair_occupancy"] = lone_pair_occ[0]
+                            node["lone_pair_energy"] = lone_pair_en[0]
+                        else:
+                            for j, (occ, en) in enumerate(zip(lone_pair_occ, lone_pair_en), 1):
+                                if occ is not None:
+                                    node[f"lone_pair_{j}_occupancy"] = occ
+                                    node[f"lone_pair_{j}_energy"] = en
                 
             elif self.graph_type == "QM":
                 npa_features = self.qm_data.vectorized_extract_charges(node_data, [i], 'NPA')[0]

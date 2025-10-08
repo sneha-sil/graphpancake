@@ -81,11 +81,23 @@ def process_single_molecule_multiprocessing(args):
         # Add graph type and metadata
         qm_dict['graph_type'] = mol_dict['graph_type']
         
-        # Create molecular graph and extract database data
+        # Create molecular graph and save directly to database
         dict_data = DictData(qm_dict)
         molecular_graph = MolecularGraph(dict_data)
         molecular_graph.graph_id = mol_id
         molecular_graph.graph_type = mol_dict['graph_type']
+        
+        # Set the graph ID in graph_info so the save_to_database method can access it via self.id
+        molecular_graph.graph_info.id = mol_id
+        
+        # Store labels data for database saving
+        molecular_graph._labels_data = mol_dict['labels']
+        
+        # Get database path from config using consistent function
+        database_path = get_database_path(config)
+        
+        # Save full graph structure to database
+        molecular_graph.save_to_database(database_path)
         
         if hasattr(molecular_graph.nodes, '__len__'):
             node_count = len(molecular_graph.nodes)
@@ -101,7 +113,6 @@ def process_single_molecule_multiprocessing(args):
         else:
             edge_count = 0
         
-        # Return processed data as dict
         return {
             'id': molecular_graph.graph_id,
             'graph_type': molecular_graph.graph_type,
@@ -110,7 +121,7 @@ def process_single_molecule_multiprocessing(args):
             'edges': edge_count,
             'node_features': len(molecular_graph.get_node_features()) if molecular_graph.get_node_features() else 0,
             'edge_features': len(molecular_graph.get_edge_features()) if molecular_graph.get_edge_features() else 0,
-            'graph_data': molecular_graph._qm_data.to_dict() if hasattr(molecular_graph._qm_data, 'to_dict') else {}
+            'saved_to_db': True
         }
         
     except Exception as e:
@@ -189,6 +200,21 @@ def get_config_value(config: Dict, path: str, default=None):
             return default
     
     return value
+
+def get_database_path(config: Dict) -> str:
+    """
+    Get the database path with consistent .db extension handling.
+    
+    Args:
+        config: Configuration dictionary
+        
+    Returns:
+        Database path with .db extension
+    """
+    db_name = get_config_value(config, 'output.database_name', 'molecular_graphs')
+    if not db_name.endswith('.db'):
+        db_name += '.db'
+    return db_name
 
 class MemoryMonitor:
     """Monitor and manage memory usage during batch processing."""
@@ -389,10 +415,7 @@ class BatchProcessor:
     
     def _create_database(self):
         """Create output database with appropriate schema."""
-        db_name = get_config_value(self.config, 'output.database_name', 'molecular_graphs')
-        if not db_name.endswith('.db'):
-            db_name += '.db'
-        output_path = Path(db_name)
+        output_path = Path(get_database_path(self.config))
 
         # Always recreate the database to ensure correct schema
         if output_path.exists():
@@ -608,9 +631,30 @@ class BatchProcessor:
         
         # Batch process labels for faster lookup
         labels_dict = {}
+        
+        # Get configuration for label processing
+        smiles_column = get_config_value(self.config, 'labels_config.smiles_column')
+        
+        # Get the configured label columns (only extract these, not all CSV columns)
+        label_columns = []
+        labels_column = get_config_value(self.config, 'labels_config.labels_column')
+        if labels_column and labels_column in labels_df.columns:
+            label_columns.append(labels_column)
+        
+        # Always include SMILES if configured
+        if smiles_column and smiles_column in labels_df.columns:
+            label_columns.append(smiles_column)
+            
+        logger.info(f"Processing label columns: {label_columns}")
+        
         for _, row in labels_df.iterrows():
             mol_id = str(row[id_column])
-            labels_dict[mol_id] = row.to_dict()
+            # Only extract specified label columns, not all CSV columns
+            labels_data = {}
+            for col in label_columns:
+                if col in row and pd.notna(row[col]):  # Skip NaN values
+                    labels_data[col] = row[col]
+            labels_dict[mol_id] = labels_data
         
         processed_count = 0
         total_mols = len(mol_ids)
@@ -833,119 +877,73 @@ class BatchProcessor:
             else:
                 logger.warning("All molecular graph generation efforts were unsuccessful, nothing to save to database")
     
-    def _process_chunk_threading(self, molecules_chunk: List[MoleculeData]):
-        """Fallback threading approach (limited by Python GIL)."""
-        cpu_cores = self._memory_monitor.cpu_count or 16
-        max_workers = min(cpu_cores, get_config_value(self.config, 'settings.max_workers', 16))
+    # def _process_chunk_threading(self, molecules_chunk: List[MoleculeData]):
+    #     """Fallback threading approach (limited by Python GIL)."""
+    #     cpu_cores = self._memory_monitor.cpu_count or 16
+    #     max_workers = min(cpu_cores, get_config_value(self.config, 'settings.max_workers', 16))
         
-        logger.info(f"Processing {len(molecules_chunk)} molecules with {max_workers} threads")
+    #     logger.info(f"Processing {len(molecules_chunk)} molecules with {max_workers} threads")
         
-        # Process molecules using threading (fallback approach)
-        molecular_graphs = []
+    #     # Process molecules using threading (fallback approach)
+    #     molecular_graphs = []
         
-        def process_single_threaded(mol_data):
-            return self._process_single_molecule_return_graph(mol_data)
+    #     def process_single_threaded(mol_data):
+    #         return self._process_single_molecule_return_graph(mol_data)
         
-        # Use ThreadPoolExecutor for fallback
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = [executor.submit(process_single_threaded, mol_data) 
-                      for mol_data in molecules_chunk]
+    #     # Use ThreadPoolExecutor for fallback
+    #     with ThreadPoolExecutor(max_workers=max_workers) as executor:
+    #         futures = [executor.submit(process_single_threaded, mol_data) 
+    #                   for mol_data in molecules_chunk]
             
-            for future in as_completed(futures):
-                try:
-                    result = future.result(timeout=300)  # 5 minute timeout per molecule
-                    if result:
-                        molecular_graphs.append(result)
-                except Exception as e:
-                    logger.warning(f"Threading error: {e}")
+    #         for future in as_completed(futures):
+    #             try:
+    #                 result = future.result(timeout=300)  # 5 minute timeout per molecule
+    #                 if result:
+    #                     molecular_graphs.append(result)
+    #             except Exception as e:
+    #                 logger.warning(f"Threading error: {e}")
         
-        # Batch save to database
-        if molecular_graphs:
-            self._batch_save_to_database(molecular_graphs)
+    #     # Batch save to database
+    #     if molecular_graphs:
+    #         self._batch_save_to_database(molecular_graphs)
     
     def _save_processed_results_to_database(self, processed_results: List[Dict]):
-        """Save processed results from multiprocessing to database efficiently."""
+        """Process results from multiprocessing - database saves already completed in worker functions."""
         if not processed_results:
             return
             
-        database_path = get_config_value(self.config, 'output.database_name', 'molecular_graphs.db')
-        
         try:
             start_time = time.time()
             
-            with sqlite3.connect(database_path) as conn:
-                cursor = conn.cursor()
+            # Count successful saves (molecules are already saved by worker processes)
+            successful_count = 0
+            for result in processed_results:
+                # Skip error results
+                if result.get('error'):
+                    error_info = {
+                        'mol_id': result['mol_id'],
+                        'error': result['error_message'],
+                        'available_files': {}
+                    }
+                    self.failed_molecules.append(error_info)
+                    logger.debug(f"Skipping error result for {result['mol_id']}: {result['error_message']}")
+                    continue
                 
-                # Ensure table exists before batch operations
-                cursor.execute('''
-                    CREATE TABLE IF NOT EXISTS molecular_graphs (
-                        id TEXT PRIMARY KEY,
-                        graph_type TEXT,
-                        smiles TEXT,
-                        nodes INTEGER,
-                        edges INTEGER,
-                        node_features INTEGER,
-                        edge_features INTEGER,
-                        graph_data TEXT
-                    )
-                ''')
-                
-                # Prepare batch insert data
-                batch_data = []
-                successful_count = 0
-                
-                for result in processed_results:
-                    # Skip error results
-                    if result.get('error'):
-                        error_info = {
-                            'mol_id': result['mol_id'],
-                            'error': result['error_message'],
-                            'available_files': {}
-                        }
-                        self.failed_molecules.append(error_info)
-                        logger.debug(f"Skipping error result for {result['mol_id']}: {result['error_message']}")
-                        continue
-                    
-                    try:
-                        logger.debug(f"Processing result for {result.get('id', 'unknown')}: keys={list(result.keys())}")
-                        
-                        batch_data.append((
-                            result['id'],
-                            result['graph_type'],
-                            result['smiles'],
-                            result['nodes'],
-                            result['edges'],
-                            result['node_features'],
-                            result['edge_features'],
-                            json.dumps(result['graph_data'], default=str)
-                        ))
-                        successful_count += 1
-                        
-                    except Exception as e:
-                        logger.warning(f"Failed to prepare batch data for {result.get('id', 'unknown')}: {e}")
-                        logger.debug(f"Result structure: {result}")
-                        continue
-                
-                # Batch insert
-                if batch_data:
-                    cursor.executemany('''
-                        INSERT INTO molecular_graphs 
-                        (id, graph_type, smiles, nodes, edges, node_features, edge_features, graph_data)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    ''', batch_data)
-                    
-                    conn.commit()
-                    
-                    # Update success count
-                    self.successful_count += successful_count
-                    
-                    duration = time.time() - start_time
-                    logger.info(f"Saved {successful_count} molecules to database in {duration:.3f}s")
-                else:
-                    logger.warning("No valid data to save to database")
+                if result.get('saved_to_db'):
+                    successful_count += 1
+                    logger.debug(f"Confirmed database save for {result.get('id', 'unknown')}")
+            
+            # Update success count 
+            self.successful_count += successful_count
+            
+            duration = time.time() - start_time
+            if successful_count > 0:
+                logger.info(f"Saved {successful_count} molecules to database in {duration:.3f}s")
+            else:
+                logger.warning("No valid data to save to database")
                     
         except Exception as e:
-            logger.error(f"Saving to database failed: {e}")
+            logger.error(f"Processing results failed: {e}")
     
     def _process_single_molecule_return_graph(self, mol_data: MoleculeData):
         """Process a single molecule and return the graph object (don't save to database yet)."""
@@ -1016,108 +1014,121 @@ class BatchProcessor:
             return None
     
     def _batch_save_to_database(self, molecular_graphs: List):
-        """Save multiple molecular graphs to database using batch operations."""
+        """Save multiple molecular graphs to database using individual save method for new schema."""
         if not molecular_graphs:
             return
             
-        database_path = get_config_value(self.config, 'output.database_name', 'molecular_graphs.db')
+        database_path = get_database_path(self.config)
         
         try:
-            # Use a single database connection for the entire batch
             import sqlite3
-            import json
             from pathlib import Path
             
             start_time = time.time()
             
             with sqlite3.connect(database_path) as conn:
                 cursor = conn.cursor()
-                
-                cursor.execute('''
-                    CREATE TABLE IF NOT EXISTS molecular_graphs (
-                        id TEXT PRIMARY KEY,
-                        graph_type TEXT,
-                        smiles TEXT,
-                        nodes INTEGER,
-                        edges INTEGER,
-                        node_features INTEGER,
-                        edge_features INTEGER,
-                        graph_data TEXT
-                    )
-                ''')
-                
-                batch_data = []
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='graphs';")
+                graphs_table_exists = cursor.fetchone() is not None
+            
+            if graphs_table_exists:
+                logger.info(f"Using new schema - saving {len(molecular_graphs)} graphs individually")
+                successful_count = 0
                 for graph in molecular_graphs:
                     try:
-                        if hasattr(graph.nodes, '__len__'):
-                            node_count = len(graph.nodes)
-                        elif hasattr(graph, 'node_count'):
-                            node_count = graph.node_count
-                        else:
-                            node_count = 0
-                            
-                        if hasattr(graph.edges, '__len__'):
-                            edge_count = len(graph.edges)
-                        elif hasattr(graph, 'edge_count'):
-                            edge_count = graph.edge_count
-                        else:
-                            edge_count = 0
-                    
-                        graph_data = {
-                            'id': graph.graph_id,
-                            'graph_type': graph.graph_type,
-                            'smiles': getattr(graph.dict_data, 'smiles', ''),
-                            'nodes': node_count,
-                            'edges': edge_count,
-                            'node_features': len(graph.get_node_features()) if graph.get_node_features() else 0,
-                            'edge_features': len(graph.get_edge_features()) if graph.get_edge_features() else 0,
-                            'graph_data': graph.dict_data.to_dict() if hasattr(graph.dict_data, 'to_dict') else {}
-                        }
-                        
-                        batch_data.append((
-                            graph_data['id'],
-                            graph_data['graph_type'], 
-                            graph_data['smiles'],
-                            graph_data['nodes'],
-                            graph_data['edges'],
-                            graph_data['node_features'],
-                            graph_data['edge_features'],
-                            json.dumps(graph_data['graph_data'], default=str)
-                        ))
+                        graph.save_to_database(database_path)
+                        successful_count += 1
                     except Exception as e:
-                        logger.warning(f"Failed to prepare batch data for graph {graph.graph_id}: {e}")
+                        logger.warning(f"Failed to save graph {graph.graph_id}: {e}")
                         continue
                 
-                # Batch insert
-                cursor.executemany('''
-                    INSERT INTO molecular_graphs 
-                    (id, graph_type, smiles, nodes, edges, node_features, edge_features, graph_data)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ''', batch_data)
+                logger.info(f"Successfully saved {successful_count}/{len(molecular_graphs)} graphs")
                 
-                conn.commit()
-            
-            # Update success count
-            self.successful_count += len(molecular_graphs)
-            
-            duration = time.time() - start_time
-            logger.info(f"Batch saved {len(molecular_graphs)} molecules to database in {duration:.3f}s")
-            
-            # Clean up graph objects
-            for graph in molecular_graphs:
-                del graph
+            else:
+                # Error if new schema not available
+                raise RuntimeError("New schema (graphs table) not found. Database must be created with new schema.")
                 
         except Exception as e:
-            logger.error(f"Batch database save failed: {e}")
-            # Fallback to individual saves
-            logger.info("Falling back to individual database saves...")
-            for graph in molecular_graphs:
-                try:
-                    graph.save_to_database(database_path)
-                    self.successful_count += 1
-                except Exception as individual_error:
-                    logger.error(f"Failed to save {graph.graph_id}: {individual_error}")
+            logger.error(f"Database save failed: {e}")
+            raise
     
+    # def _batch_save_to_database_old_schema(self, molecular_graphs: List):
+    #     """Fallback method for old schema compatibility."""
+    #     database_path = get_config_value(self.config, 'output.database_name', 'molecular_graphs.db')
+    #     if not database_path.endswith('.db'):
+    #         database_path += '.db'
+        
+    #     import sqlite3
+    #     import json
+        
+    #     with sqlite3.connect(database_path) as conn:
+    #         cursor = conn.cursor()
+            
+    #         cursor.execute('''
+    #             CREATE TABLE IF NOT EXISTS molecular_graphs (
+    #                 id TEXT PRIMARY KEY,
+    #                 graph_type TEXT,
+    #                 smiles TEXT,
+    #                 nodes INTEGER,
+    #                 edges INTEGER,
+    #                 node_features INTEGER,
+    #                 edge_features INTEGER,
+    #                 graph_data TEXT
+    #             )
+    #         ''')
+            
+    #         batch_data = []
+    #         for graph in molecular_graphs:
+    #             try:
+    #                 if hasattr(graph.nodes, '__len__'):
+    #                     node_count = len(graph.nodes)
+    #                 elif hasattr(graph, 'node_count'):
+    #                     node_count = graph.node_count
+    #                 else:
+    #                     node_count = 0
+                        
+    #                 if hasattr(graph.edges, '__len__'):
+    #                     edge_count = len(graph.edges)
+    #                 elif hasattr(graph, 'edge_count'):
+    #                     edge_count = graph.edge_count
+    #                 else:
+    #                     edge_count = 0
+                
+    #                 graph_data = {
+    #                     'id': graph.graph_id,
+    #                     'graph_type': graph.graph_type,
+    #                     'smiles': getattr(graph.dict_data, 'smiles', ''),
+    #                     'nodes': node_count,
+    #                     'edges': edge_count,
+    #                     'node_features': len(graph.get_node_features()) if graph.get_node_features() else 0,
+    #                     'edge_features': len(graph.get_edge_features()) if graph.get_edge_features() else 0,
+    #                     'graph_data': graph.dict_data.to_dict() if hasattr(graph.dict_data, 'to_dict') else {}
+    #                 }
+                    
+    #                 batch_data.append((
+    #                     graph_data['id'],
+    #                     graph_data['graph_type'], 
+    #                     graph_data['smiles'],
+    #                     graph_data['nodes'],
+    #                     graph_data['edges'],
+    #                     graph_data['node_features'],
+    #                     graph_data['edge_features'],
+    #                     json.dumps(graph_data['graph_data'], default=str)
+    #                 ))
+    #             except Exception as e:
+    #                 logger.warning(f"Failed to prepare batch data for graph {graph.graph_id}: {e}")
+    #                 continue
+            
+    #         # Batch insert
+    #         cursor.executemany('''
+    #             INSERT INTO molecular_graphs 
+    #             (id, graph_type, smiles, nodes, edges, node_features, edge_features, graph_data)
+    #             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    #         ''', batch_data)
+    #
+    #         conn.commit()
+    #         logger.info(f"Saved {len(batch_data)} graphs using old schema")
+
     def _preload_molecule_files(self, mol_data: MoleculeData):
         """Preload file contents for a single molecule in parallel."""
         try:
