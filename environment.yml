@@ -23,6 +23,9 @@ dependencies:
   - pytorch
   - pyg  # PyTorch Geometric
   
+  # Database and file handling
+  - sqlite  # For database operations (sqlite3 module uses this)
+  
   # Python version specific
   - importlib-resources  # Only needed for Python <3.10
   

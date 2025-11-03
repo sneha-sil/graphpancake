@@ -1,9 +1,8 @@
 from rdkit import Chem
-from rdkit.Chem import Descriptors
 import numpy as np
 import regex as re
 import mmap
-from typing import Union, List, Dict, Any, Optional, Tuple
+from typing import Union, List, Optional, Tuple
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -1689,13 +1688,11 @@ def get_clpo_by_type(
     if isinstance(target_types, str):
         target_types = [target_types]
     
-    # Extract types and convert to numpy array for vectorized operations
     types = np.array([entry[1] for entry in clpo_data])
     
-    # Create boolean mask for target types
+    # Create boolean mask
     mask = np.isin(types, target_types)
     
-    # Filter using boolean indexing (convert back to list)
     return [clpo_data[i] for i in range(len(clpo_data)) if mask[i]]
 
 def get_LP_CLPOs(clpo_data: List[List]) -> List[List]:
@@ -1772,7 +1769,6 @@ def get_wiberg_bond_orders_batch(
     i_indices = np.array([pair[0] for pair in bond_indices_list])
     j_indices = np.array([pair[1] for pair in bond_indices_list])
     
-    # Get bond orders using advanced indexing
     bond_orders_ij = matrix[i_indices, j_indices]
     bond_orders_ji = matrix[j_indices, i_indices]
     

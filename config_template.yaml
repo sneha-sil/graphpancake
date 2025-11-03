@@ -4,7 +4,7 @@
 # Save as config.yaml and use with: python batch_processing_script.py
 
 data_paths:
-  # Option 1: Individual directories (set archive_file to null if using this option)
+  # Option 1: Individual directories (set archive_file to null if using this)
   base_dir: null # "/path/to/your/molecular/data"
   xyz_dir: null # "/path/to/your/molecular/data/xyz_files"
   shermo_dir: null # "/path/to/your/molecular/data/shermo_outputs"
@@ -12,42 +12,32 @@ data_paths:
   nbo_dir: null # "/path/to/your/molecular/data/nbo_outputs"
 
   # Option 2: Compressed archive containing all data (set directories to null if using this)
-  archive_file:  # "/path/to/your/data.tar.gz"
+  archive_file: /home/uvx4187/graphpancake_data/SS-07-07_data.tar.gz # "/path/to/your/data.tar.gz"
 
 file_patterns:
+  # IMPORTANT: graph type (QM, NPA, NBO, DFT) determined by available files
+  # Comment out which files you do not have
   # Matching files to your molecular identifier, customize each pattern as necessary
   # Use {mol_id} as placeholder for the molecule identifier
-  xyz_pattern: "{mol_id}.xyz"                    # e.g., mol_001.xyz
+  xyz_pattern: "{mol_id}_geom.xyz"                    # e.g., mol_001_geom.xyz
   shermo_pattern: "{mol_id}_shermo.out"          # e.g., mol_001_shermo.out
-  janpa_pattern: "{mol_id}_janpa.out"            # e.g., mol_001_janpa.out
+  janpa_pattern: "{mol_id}_wft.JANPA"            # e.g., mol_001_wft.JANPA
   nbo_pattern: "{mol_id}_nbo.out"                # e.g., mol_001_nbo.out
 
 # CSV file containing molecular identifiers, SMILES strings, and miscellaneous properties
-data_file: "/path/to/your/data.csv"
+data_file: "/home/uvx4187/graphpancake_data/SS-07-07_data.csv"
 
-labels_file: "/path/to/your/labels.csv"  # CSV file with labels corresponding to rows in the data csv file (can be the same as the data_file)
+labels_file: "/home/uvx4187/graphpancake_data/SS-07-07_labels.csv"  # CSV file with labels corresponding to rows in the data csv file (can be the same as the data_file)
 
 labels_config:
   # Column names in your labels CSV file
   id_column: "mol_id"        # Column containing unique molecule identifiers, taken from data csv
-  smiles_column: "smiles"    # Column containing SMILES strings, taken from data csv
-  labels_column: "labels"     # Column containing target property for regression/classification, taken from labels csv
+  smiles_column: "SMILES"    # Column containing SMILES strings, taken from data csv
+  labels_column: "logP"     # Column containing target property for regression/classification, taken from labels csv
 
 settings:
-  # comment out any graph types you do not have data for
-  graph_types: 
-    - "DFT"     # Data mainly from DFT calcs. (.xyz & Shermo)
-    - "NPA"     # Natural Population Analysis (+ JANPA)
-    - "NBO"     # Natural Bond Orbital analysis (+ NBO)
-    - "QM"      # Combined DFT, NPA & NBO analysis
-  
-  # Performance settings
-  batch_size: 1000           # Number of molecules per processing chunk
-  max_workers: 16            # Number of parallel processing threads
-  
-  # Chemical parameters
-  bond_threshold: 0.4       # Minimum Wiberg bond order for edge creation
-  max_distance: 3.0         # Maximum atomic distance (in Angstroms, Å) for edge creation
+  max_workers: 16            # Number of parallel workers (setting this too high will lock the database!)
+  batch_size: 1000           # Molecules processed per batch  
 
 memory:
   clear_cache_frequency: 1000        # Clear file cache every N molecules
@@ -55,12 +45,11 @@ memory:
 
 cleanup:
   remove_temp_files: true            # Remove temporary extraction directory after processing
-
+  
 output:
-  database_name: "molecular_graphs"    # Output database file name, will have .db extension
-  overwrite_existing: false               # Whether to overwrite existing database
+  database_name: "SS-07-07_QM"              # Whether to overwrite existing database
   export_ml_features: true                # Export a csv file of ML features
-  ml_export_dir: "/path/to/ml_export_dir"                # Directory for ML feature exports
+  ml_export_dir: "/home/uvx4187/graphpancake_data"                # Directory for ML feature exports
 
 error_handling:
   continue_on_error: true           # Continue processing if some molecules fail
@@ -70,4 +59,4 @@ error_handling:
 logging:
   level: "INFO"                     # DEBUG, INFO, WARNING, ERROR
   save_to_file: true                # Save logs to file
-  log_file: "batch_processing.log"  # Log file name
+  log_file: "SS-07-07_batch_processing.log"  # Log file name

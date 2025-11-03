@@ -732,9 +732,6 @@ class MolecularGraph:
             if self._qm_data.graph_type in ["NPA", "QM"]:
                 expected_columns.append('num_2C_BDs')
             
-            # logger.info(f"\tGraph type: {self._qm_data.graph_type}")
-            # logger.info(f"\tProcessing {len(node_features)} atoms and {len(edge_features)} edges")
-            
             for edge_idx, edge in enumerate(edge_features):
                 try:
                     # Validate and clean edge data
@@ -867,12 +864,11 @@ class MolecularGraph:
             if hasattr(self, '_labels_data') and self._labels_data:
                 logger.debug(f"Inserting labels for {self.id}: {self._labels_data}")
                 for label_name, label_value in self._labels_data.items():
-                    # Skip mol_id as it's the graph_id
+                    # Skip mol_id
                     if label_name == 'mol_id':
                         continue
                     
                     if label_name.lower() in ['smiles']:
-                        # logger.debug(f"Skipping SMILES column as it's not a label: {label_name}={label_value}")
                         continue
                     
                     # Determine label type based on value

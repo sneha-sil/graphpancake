@@ -182,8 +182,8 @@ import sys
 import os
 import logging
 from pathlib import Path
-from typing import Optional, List, Dict, Any
 import pandas as pd
+import sqlite3
 
 try:
     from .graph import MolecularGraph
@@ -191,7 +191,6 @@ try:
     from .functions import generate_qm_data_dict
     from ._version import __version__
 except ImportError:
-    # Fallback for direct execution
     sys.path.insert(0, os.path.dirname(__file__))
     from graphpancake.graph import MolecularGraph
     from graphpancake.classes import DictData
@@ -216,7 +215,7 @@ def print_logo():
 
 
 class graphpancakeCLI:
-    """Main CLI handler for GraphPancake operations."""
+    """Main CLI handler for graphpancake operations."""
     
     def __init__(self):
         self.setup_logging()
@@ -243,7 +242,6 @@ class graphpancakeCLI:
             return 1
         
         try:
-            # Use the class method to create database schema
             graph_types = args.graph_types or ['DFT', 'NPA', 'NBO', 'QM']
             MolecularGraph.create_database(str(db_path), graph_types=graph_types)
             
@@ -262,7 +260,7 @@ class graphpancakeCLI:
             return 1
         
         if not Path(args.xyz_file).exists():
-            self.logger.error(f"XYZ file not found: {args.xyz_file}")
+            self.logger.error(f".xyz file not found: {args.xyz_file}")
             return 1
         
         if not Path(args.shermo_output).exists():
@@ -270,7 +268,6 @@ class graphpancakeCLI:
             return 1
         
         try:
-            # Generate QM data dictionary
             self.logger.info(f"\t Processing molecule: {args.mol_id}, {args.smiles}")
             qm_data = generate_qm_data_dict(
                 mol_id=args.mol_id,
@@ -281,17 +278,13 @@ class graphpancakeCLI:
                 nbo_output=args.nbo_output
             )
             
-            # Create DictData object
             dict_data = DictData(qm_data)
             
-            # Create molecular graph
             mol_graph = MolecularGraph(dict_data)
             
-            # Set molecule ID and graph type
             mol_graph.graph_info.id = args.mol_id
             mol_graph._qm_data.graph_type = args.graph_type
             
-            # Save to database
             mol_graph.save_to_database(args.database)
             
             self.logger.info(f"\tSuccessfully loaded {args.mol_id} into database")
@@ -308,10 +301,8 @@ class graphpancakeCLI:
             return 1
         
         try:
-            import sqlite3
             conn = sqlite3.connect(args.database)
             
-            # Build query
             query = "SELECT * FROM graphs"
             params = []
             
@@ -323,7 +314,6 @@ class graphpancakeCLI:
                 query += " LIMIT ?"
                 params.append(args.limit)
             
-            # Execute query
             df = pd.read_sql_query(query, conn, params=params)
             conn.close()
             
@@ -331,7 +321,6 @@ class graphpancakeCLI:
                 self.logger.info("\tNo molecules found matching criteria")
                 return 0
             
-            # Output results
             if args.output:
                 output_path = Path(args.output)
                 if args.format == 'csv':
@@ -365,10 +354,7 @@ class graphpancakeCLI:
         output_dir.mkdir(parents=True, exist_ok=True)
         
         try:
-            import sqlite3
             conn = sqlite3.connect(args.database)
-            
-            # Query molecules
             query = "SELECT graph_id as mol_id, graph_type FROM graphs"
             params = []
             if args.graph_type:
@@ -381,7 +367,6 @@ class graphpancakeCLI:
                 self.logger.warning("No molecules found for ML export")
                 return 0
             
-            # Initialize feature collections
             graph_features = []
             node_features = []
             edge_features = []
@@ -390,23 +375,19 @@ class graphpancakeCLI:
             for _, row in molecules.iterrows():
                 mol_id, graph_type = row['mol_id'], row['graph_type']
                 try:
-                    # Load molecular graph
                     mol_graph = MolecularGraph()
                     mol_graph.load_from_database(args.database, mol_id, graph_type)
-                    # Extract graph-level features
                     graph_feat = {
                         'mol_id': mol_id,
                         'graph_type': graph_type,
                         'num_atoms': len(mol_graph.nodes) if hasattr(mol_graph, 'nodes') else 0,
                         'num_edges': len(mol_graph.edges) if hasattr(mol_graph, 'edges') else 0,
                     }
-                    # Add metadata features
                     if hasattr(mol_graph, 'metadata') and mol_graph.metadata:
                         for key, value in mol_graph.metadata.items():
                             if isinstance(value, (int, float, str)):
                                 graph_feat[f'meta_{key}'] = value
                     graph_features.append(graph_feat)
-                    # Extract node features (quantitative only)
                     if hasattr(mol_graph, 'nodes'):
                         for node_id, node_data in mol_graph.nodes.items():
                             node_feat = {
@@ -417,9 +398,8 @@ class graphpancakeCLI:
                             for key, value in node_data.items():
                                 if isinstance(value, (int, float)):
                                     node_feat[f'node_{key}'] = value
-                            if node_feat:  # Only add if we have features
+                            if node_feat:
                                 node_features.append(node_feat)
-                    # Extract edge features (quantitative only)
                     if hasattr(mol_graph, 'edges'):
                         for edge_id, edge_data in mol_graph.edges.items():
                             edge_feat = {
@@ -430,9 +410,8 @@ class graphpancakeCLI:
                             for key, value in edge_data.items():
                                 if isinstance(value, (int, float)):
                                     edge_feat[f'edge_{key}'] = value
-                            if edge_feat:  # Only add if we have features
+                            if edge_feat:
                                 edge_features.append(edge_feat)
-                    # Extract target features
                     if hasattr(mol_graph, 'targets'):
                         for target_name, target_value in mol_graph.targets.items():
                             if isinstance(target_value, (int, float)):
@@ -444,28 +423,23 @@ class graphpancakeCLI:
                 except Exception as e:
                     self.logger.warning(f"Failed to process {mol_id}: {e}")
                     continue
-            # Combine all features into a single file
             combined_features = []
             for graph_feat in graph_features:
                 combined_feat = dict(graph_feat)
-                # Combine target features for this graph
                 targets = [tf for tf in target_features if tf['mol_id'] == graph_feat['mol_id']]
                 for target in targets:
                     combined_feat[f"target_{target['target_name']}"] = target['target_value']
-                # Add node features for this graph
                 nodes = [nf for nf in node_features if nf['mol_id'] == graph_feat['mol_id']]
                 for node in nodes:
                     for k, v in node.items():
                         if k not in ['mol_id', 'node_id', 'graph_type']:
                             combined_feat[f"node_{k}"] = v
-                # Add edge features for this graph
                 edges = [ef for ef in edge_features if ef['mol_id'] == graph_feat['mol_id']]
                 for edge in edges:
                     for k, v in edge.items():
                         if k not in ['mol_id', 'edge_id', 'graph_type']:
                             combined_feat[f"edge_{k}"] = v
                 combined_features.append(combined_feat)
-            # Save combined features file
             if combined_features:
                 if args.format == 'csv':
                     pd.DataFrame(combined_features).to_csv(output_dir / 'ml_features.csv', index=False)
@@ -489,12 +463,9 @@ class graphpancakeCLI:
             return 1
         
         try:
-            # Connect to database
-            import sqlite3
             conn = sqlite3.connect(args.database)
             cursor = conn.cursor()
             
-            # Check if labels table exists, create if not
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS labels (
                     graph_id TEXT,
@@ -506,19 +477,16 @@ class graphpancakeCLI:
                 )
             ''')
             
-            # Handle manual input mode
             if args.graph_id:
                 if args.value is None:
                     self.logger.error("--value is required when using manual input mode (--graph-id)")
                     return 1
                 
-                # Check if graph exists in database
                 cursor.execute("SELECT COUNT(*) FROM graphs WHERE graph_id = ?", (args.graph_id,))
                 if cursor.fetchone()[0] == 0:
                     self.logger.error(f"Graph '{args.graph_id}' not found in database")
                     return 1
                 
-                # Insert or update label
                 cursor.execute('''
                     INSERT OR REPLACE INTO labels (graph_id, label_name, label_value, label_type)
                     VALUES (?, ?, ?, ?)
@@ -533,16 +501,13 @@ class graphpancakeCLI:
                 
                 return 0
             
-            # Handle CSV file mode
             elif args.csv_file:
                 if not Path(args.csv_file).exists():
                     self.logger.error(f"CSV file not found: {args.csv_file}")
                     return 1
                 
-                # Read CSV file
                 df = pd.read_csv(args.csv_file)
                 
-                # Validate required columns
                 if args.id_column not in df.columns:
                     self.logger.error(f"ID column '{args.id_column}' not found in CSV. Available columns: {list(df.columns)}")
                     return 1
@@ -551,7 +516,6 @@ class graphpancakeCLI:
                     self.logger.error(f"Label column '{args.label_column}' not found in CSV. Available columns: {list(df.columns)}")
                     return 1
                 
-                # Process each row
                 added_count = 0
                 error_count = 0
                 
@@ -560,17 +524,14 @@ class graphpancakeCLI:
                     target_value = row[args.label_column]
                     
                     try:
-                        # Validate target value is numeric
                         target_value = float(target_value)
                         
-                        # Check if graph exists in database
                         cursor.execute("SELECT COUNT(*) FROM graphs WHERE graph_id = ?", (graph_id,))
                         if cursor.fetchone()[0] == 0:
                             self.logger.warning(f"Graph '{graph_id}' not found in database, skipping")
                             error_count += 1
                             continue
                         
-                        # Insert or update label
                         cursor.execute('''
                             INSERT OR REPLACE INTO labels (graph_id, label_name, label_value, label_type)
                             VALUES (?, ?, ?, ?)
@@ -610,24 +571,18 @@ class graphpancakeCLI:
             return 1
         
         try:
-            import sqlite3
             conn = sqlite3.connect(args.database)
-            
-            # Basic statistics
             cursor = conn.cursor()
             
-            # Total molecules
             cursor.execute("SELECT COUNT(*) FROM graphs")
             total_molecules = cursor.fetchone()[0]
             
-            # Total nodes and edges
             cursor.execute("SELECT COUNT(*) FROM nodes")
             total_nodes = cursor.fetchone()[0]
             
             cursor.execute("SELECT COUNT(*) FROM edges")
             total_edges = cursor.fetchone()[0]
             
-            # By graph type
             cursor.execute("SELECT graph_type, COUNT(*) FROM graphs GROUP BY graph_type")
             by_type = cursor.fetchall()
             
@@ -638,7 +593,6 @@ class graphpancakeCLI:
             print(f"Total nodes: {total_nodes}")
             print(f"Total edges: {total_edges}")
             
-            # Add averages if we have molecules
             if total_molecules > 0:
                 avg_nodes = total_nodes / total_molecules
                 avg_edges = total_edges / total_molecules
@@ -651,10 +605,8 @@ class graphpancakeCLI:
                     print(f"  {graph_type}: {count}")
             
             if args.detailed:
-                # Additional detailed statistics
                 print(f"\n Detailed Analysis:")
                 
-                # Check bond count discrepancy
                 cursor.execute("SELECT SUM(num_bonds) FROM graphs")
                 expected_bonds = cursor.fetchone()[0] or 0
                 if expected_bonds != total_edges:
@@ -662,7 +614,6 @@ class graphpancakeCLI:
                     print(f"   Expected bonds (from graphs): {expected_bonds}")
                     print(f"   Actual edges in database: {total_edges}")
                 
-                # Molecule size distribution
                 cursor.execute("SELECT num_atoms, COUNT(*) FROM graphs GROUP BY num_atoms ORDER BY num_atoms")
                 size_dist = cursor.fetchall()
                 if size_dist:
@@ -670,13 +621,11 @@ class graphpancakeCLI:
                     for size, count in size_dist:
                         print(f"   {size} atoms: {count} molecules")
                 
-                # Check targets table
                 cursor.execute("SELECT COUNT(*) FROM targets")
                 total_targets = cursor.fetchone()[0]
                 print(f"\n Additional data:")
                 print(f"   Target features: {total_targets}")
                 
-                # Recent molecules
                 cursor.execute("SELECT graph_id, graph_type, num_atoms, num_bonds, created_timestamp FROM graphs ORDER BY created_timestamp DESC LIMIT 10")
                 recent = cursor.fetchall()
                 
@@ -685,7 +634,6 @@ class graphpancakeCLI:
                     for graph_id, graph_type, num_atoms, num_bonds, created_at in recent:
                         print(f"   {graph_id} ({graph_type}): {num_atoms} atoms, {num_bonds} bonds - {created_at}")
             else:
-                # Basic check for bond count mismatch even in non-detailed mode
                 cursor.execute("SELECT SUM(num_bonds) FROM graphs")
                 expected_bonds = cursor.fetchone()[0] or 0
                 if expected_bonds != total_edges and total_molecules > 0:
@@ -752,27 +700,21 @@ class graphpancakeCLI:
             params = []
             for param in args.params:
                 try:
-                    # Try int first
                     params.append(int(param))
                 except ValueError:
                     try:
-                        # Try float
                         params.append(float(param))
                     except ValueError:
                         # Keep as string
                         params.append(param)
             params = tuple(params)
         
-        # Show what would be deleted (dry run)
         if not args.confirm:
             try:
-                # Query to see what would be deleted
-                import sqlite3
                 conn = sqlite3.connect(args.database)
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
                 
-                # Build query to count matching graphs
                 count_query = f"SELECT COUNT(*) as count FROM graphs WHERE {args.where}"
                 
                 if params:
@@ -863,21 +805,15 @@ class graphpancakeCLI:
     
     def _filter_by_criteria(self, args):
         """Filter graphs matching criteria."""
-        import sqlite3
-        from .graph import MolecularGraph
         
-        # Parse parameters
         params = None
         if args.params:
-            # Try to convert params to appropriate types
             params = []
             for param in args.params:
                 try:
-                    # Try int first
                     params.append(int(param))
                 except ValueError:
                     try:
-                        # Try float
                         params.append(float(param))
                     except ValueError:
                         # Keep as string
@@ -885,7 +821,6 @@ class graphpancakeCLI:
             params = tuple(params)
         
         try:
-            # Connect to database
             conn = sqlite3.connect(args.database)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
@@ -917,8 +852,6 @@ class graphpancakeCLI:
                 self.logger.info("No graphs match the specified criteria")
                 return 0
             
-            # Convert results to DataFrame for better handling
-            import pandas as pd
             df = pd.DataFrame([dict(row) for row in results])
             
             if args.show == 'summary':
@@ -961,18 +894,15 @@ class graphpancakeCLI:
                         print(f"Found {len(results)} graphs matching criteria:")
                         print()
                         
-                        # Table headers
                         headers = ["Graph ID", "Type", "Formula", "Atoms", "Electrons", "Bonds", "Charge", "Mass", "Nodes", "Edges", "SMILES"]
                         col_widths = [10, 6, 8, 6, 9, 6, 7, 8, 6, 6, 25]
                         
-                        # Print header
                         header_line = " | ".join(f"{header:<{width}}" for header, width in zip(headers, col_widths))
                         separator_line = "-+-".join("-" * width for width in col_widths)
                         
                         print(header_line)
                         print(separator_line)
                         
-                        # Print data rows
                         for _, row in df.iterrows():
                             values = [
                                 str(row['graph_id'])[:10],  # Truncate if too long

@@ -5,32 +5,24 @@ class DictData:
     """Memory-optimized data container using __slots__."""
     
     __slots__ = [
-        # Basic molecular properties
         'graph_type', 'id', 'smiles', 'formula', 'molecular_mass', 'num_atoms',
         'xyz_coordinates', 'atomic_numbers', 'atom_labels', 'polarizability',
         'moments_of_inertia', 'rotational_constants', 'rotational_temperatures',
         'heat_capacity_Cv', 'heat_capacity_Cp', 'entropy', 'ZPE', 'electronic_energy',
         'potential_energy', 'enthalpy', 'gibbs_free_energy', 'frequencies',
         
-        # Quantum chemical analysis data
         'wiberg_bond_order_matrix', 'number_of_2C_BDs_matrix', 'natural_population_analysis_charges',
         'natural_electron_configuration', 'CLPO_data', 'natural_population_analysis',
         'natural_population_totals', 'core_NBOs', 'lone_pair_NBOs', 'bonding_NBOs',
         'antibonding_NBOs',
         
-        # Pre-computed derived properties
         'bond_distance_matrix', 'atomic_masses', 'electronegativities', 'covalent_radii',
         'wiberg_bond_order_totals', 'bound_hydrogens', 'node_degrees',
         
-        # CLPO-specific features
         'lone_pair_CLPOs', 'bonding_CLPOs', 'antibonding_CLPOs',
         
-        # Feature computation cache
         '_precomputed_node_features', '_precomputed_edge_features',
-        '_node_features_computed', '_edge_features_computed',
-        
-        # Additional derived features that might be computed
-        'npa_charges', 'wiberg_matrix', 'bond_matrix', 'orbital_occupancies'
+        '_node_features_computed', '_edge_features_computed'
     ]
     
     def __init__(self, qm_data_dict: dict):
@@ -108,7 +100,6 @@ class DictData:
     def to_dict(self):
         """
         Convert the DictData object to a dictionary for compatibility with __dict__ access.
-        This is needed because __slots__ objects don't have __dict__.
         
         Returns:
             dict: Dictionary representation of all attributes
@@ -146,7 +137,6 @@ class DictData:
         if self._node_features_computed or self.atomic_numbers is None or self.num_atoms is None:
             return
             
-        # Create structured node data - each element corresponds to one atom
         node_data = {
             'atom_indices': list(range(self.num_atoms)),
             'atomic_numbers': self.atomic_numbers,
@@ -224,7 +214,6 @@ class DictData:
                 lone_pair_occupancies.append(atom_lp_occ)
                 lone_pair_energies.append(atom_lp_en)
             
-            # For NBO graphs, Wiberg data is not available, so set to None
             wiberg_totals = [None] * self.num_atoms
             bound_h = [None] * self.num_atoms
             node_deg = [None] * self.num_atoms
@@ -232,7 +221,6 @@ class DictData:
             nmb_pops = [None] * self.num_atoms
             npa_charges = [None] * self.num_atoms
             
-            # Convert nan arrays back to lists with None for compatibility
             node_data.update({
                 'wiberg_bond_order_totals': wiberg_totals,
                 'bound_hydrogens': bound_h,
@@ -300,7 +288,6 @@ class DictData:
                 lone_pair_occupancies.append(atom_lp_occ)
                 lone_pair_energies.append(atom_lp_en)
             
-            # Combine all QM features including NPA charges
             if self.natural_population_analysis_charges:
                 electron_pops, nmb_pops, npa_charges = extract_npa_charges(self.natural_population_analysis_charges)
             else:
@@ -330,7 +317,6 @@ class DictData:
             })
             
         elif self.graph_type == "DFT":
-            # DFT only has basic atomic properties
             pass
             
         self._precomputed_node_features = node_data
@@ -668,7 +654,7 @@ class DictData:
         Get edge data formatted for database insertion.
         
         Args:
-            molecule_id (str): Optional molecule ID to include in each record
+            molecule_id (str): Optional molecule name to include in each record
             bond_order_threshold (float): Minimum bond order threshold
             max_distance (float): Maximum distance threshold
             
@@ -821,10 +807,7 @@ class GraphInfo(GraphBase):
             dict: Dictionary containing graph-level metadata.
         """
         ML_graph_info_dict = {
-            # "graph_type": self.graph_type,
             "id": self.id,
-            # "smiles": self.smiles,
-            # "formula": self.formula,
             "molecular_mass": self.molecular_mass,
             "num_atoms": self.num_atoms,
             "charge": self.total_charge,
@@ -924,7 +907,6 @@ class Node(GraphBase):
                     lone_pair_occ = node_data['lone_pair_occupancies'][i]
                     lone_pair_en = node_data['lone_pair_energies'][i]
                     
-                    # Check that both lists exist and are not None before zip
                     if lone_pair_occ is not None and lone_pair_en is not None:
                         if len(lone_pair_occ) == 2 and lone_pair_occ[0] is not None and lone_pair_occ[1] is None:
                             node["lone_pair_occupancy"] = lone_pair_occ[0]
@@ -984,7 +966,6 @@ class Node(GraphBase):
             node = {
                 "atom_index": node_data['atom_indices'][i],
                 "atomic_number": node_data['atomic_numbers'][i],
-                # "atom_label": node_data['atom_labels'][i], # string value
                 "position": node_data['positions'][i],
                 "atomic_mass": node_data['atomic_masses'][i],
                 "electronegativity": node_data['electronegativities'][i],
@@ -1173,7 +1154,6 @@ class Edge(GraphBase):
                 "atom_i": edge_data['atom_i_list'][i],
                 "atom_j": edge_data['atom_j_list'][i],
                 "distance": distance_val,
-                # "edge_type": edge_data['edge_types'][i], # string value
                 "bond_order": edge_data['bond_orders'][i],
                 "conventional_bond_order": edge_data['conventional_bond_orders'][i],
                 "num_2C_BDs": edge_data['num_2C_BDs'][i],
@@ -1301,7 +1281,6 @@ class Targets(GraphBase):
             dict: Dictionary of all target properties.
         """
         ML_targets_dict = {
-            # "frequencies": self.frequencies, # Exclude full frequency list for ML to avoid variable-length issues
             "num_frequencies": self.num_frequencies,
             "lowest_frequency": self.lowest_frequency,
             "highest_frequency": self.highest_frequency,

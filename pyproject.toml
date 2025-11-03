@@ -32,6 +32,7 @@ dependencies = [
     "regex",
     "tqdm",
     "psutil",
+    "sqlite",
     "importlib-resources; python_version<'3.10'",
 ]
 
@@ -73,7 +74,6 @@ zip-safe = false
 # recursively because of its __init__.py file, but the data subdirectory is excluded
 # with include-package-data = false and namespaces = false.
 
-# SS: change to true when data files are added
 include-package-data = false
 [tool.setuptools.packages.find]
 namespaces = false
@@ -82,7 +82,6 @@ where = ["src"]
 # Ref https://setuptools.pypa.io/en/latest/userguide/datafiles.html#package-data
 [tool.setuptools.package-data]
 
-# SS: edit when data files are added
 graphpancake = [
     "py.typed"
 ]

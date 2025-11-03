@@ -22,7 +22,6 @@ from tqdm import tqdm
 import gc
 import psutil
 import time
-import sqlite3
 import multiprocessing as mp
 import argparse
 
@@ -72,11 +71,6 @@ def process_single_molecule_multiprocessing(args):
         for field_name, field_value in qm_dict.items():
             if field_value is None:
                 continue
-                # return {
-                #     'error': True,
-                #     'mol_id': mol_id,
-                #     'error_message': f'Field {field_name} is None'
-                # }
         
         # Add graph type and metadata
         qm_dict['graph_type'] = mol_dict['graph_type']
@@ -272,36 +266,6 @@ class MoleculeData:
         self.graph_type = None
         self._file_cache = {}  # Cache for pre-loaded file contents
     
-    def preload_files(self):
-        """Pre-load file contents into memory to reduce I/O during processing."""
-        from graphpancake.functions import get_file_content
-        
-        files_to_preload = [
-            ('xyz', self.xyz),
-            ('shermo', self.shermo), 
-            ('janpa', self.janpa),
-            ('nbo', self.nbo)
-        ]
-        
-        for file_type, file_path in files_to_preload:
-            if file_path and file_path.exists():
-                try:
-                    # Use memory mapping for large files
-                    self._file_cache[file_type] = get_file_content(file_path)
-                except Exception as e:
-                    logger.warning(f"Failed to preload {file_type} file for {self.mol_id}: {e}")
-    
-    def get_file_content(self, file_type: str):
-        """Get cached file content or read from disk."""
-        if file_type in self._file_cache:
-            return self._file_cache[file_type]
-        
-        file_path = getattr(self, file_type, None)
-        if file_path and file_path.exists():
-            from graphpancake.functions import get_file_content
-            return get_file_content(file_path)
-        return None
-    
     def to_dict(self):
         """Convert to dictionary for compatibility with existing code."""
         return {
@@ -334,7 +298,7 @@ class BatchProcessor:
         start_time = time.time()
         self._memory_monitor.check_memory()  # Initialize memory monitoring
         
-        logger.info("Starting GraphPancake batch processing with optimizations...")
+        logger.info("Starting graphpancake batch processing with optimizations...")
         logger.info(f"Configuration: {self._get_config_summary()}")
         logger.info(f"Initial memory usage: {self._memory_monitor.start_memory:.1f}%")
         
@@ -409,7 +373,6 @@ class BatchProcessor:
         summary.append(f"Archive mode: {bool(get_config_value(self.config, 'data_paths.archive_file'))}")
         summary.append(f"Max workers: {get_config_value(self.config, 'settings.max_workers', 32)}")
         summary.append(f"Batch size: {get_config_value(self.config, 'settings.batch_size', 100)}")
-        summary.append(f"Graph types: {get_config_value(self.config, 'settings.graph_types', ['DFT'])}")
         summary.append(f"Output: {get_config_value(self.config, 'output.database_name', 'molecular_graphs.db')}")
         return ", ".join(summary)
     
@@ -423,8 +386,7 @@ class BatchProcessor:
             output_path.unlink()
 
         logger.info(f"Creating new database: {output_path}")
-        graph_types = get_config_value(self.config, 'settings.graph_types', ['DFT'])
-        MolecularGraph.create_database(output_path, graph_types)
+        MolecularGraph.create_database(output_path)
         logger.info("Database created successfully")
     
     def _load_labels(self) -> pd.DataFrame:
@@ -478,12 +440,12 @@ class BatchProcessor:
             with tarfile.open(archive_path, 'r:gz') as tar:
                 members = tar.getmembers()
                 for member in tqdm(members, desc="Extracting tar.gz files", unit="file"):
-                    tar.extract(member, extract_dir, filter='data')  # Fix deprecation warning
+                    tar.extract(member, extract_dir, filter='data')
         elif archive_path.suffix in ['.tar', '.tgz']:
             with tarfile.open(archive_path, 'r:*') as tar:
                 members = tar.getmembers()
                 for member in tqdm(members, desc="Extracting tar files", unit="file"):
-                    tar.extract(member, extract_dir, filter='data')  # Fix deprecation warning
+                    tar.extract(member, extract_dir, filter='data') 
         elif archive_path.suffix == '.zip':
             with zipfile.ZipFile(archive_path, 'r') as zip_file:
                 file_list = zip_file.namelist()
@@ -592,7 +554,7 @@ class BatchProcessor:
                 file_type, found_files = future.result()
                 discovered_files[file_type] = found_files
         
-        # Remove duplicates using sets for faster deduplication
+        # Remove duplicates using sets
         for file_type in discovered_files:
             discovered_files[file_type] = list(set(discovered_files[file_type]))
         
@@ -662,7 +624,7 @@ class BatchProcessor:
         for mol_id in mol_ids:
             mol_data = MoleculeData(mol_id, labels_dict.get(mol_id, {}))
             
-            # Fast file matching using lookup dictionaries
+            # Lookup dictionaries for file matching
             for file_type in ['xyz', 'shermo', 'janpa', 'nbo']:
                 pattern_key = f"{file_type}_pattern"
                 file_path = None
@@ -694,7 +656,7 @@ class BatchProcessor:
             else:
                 logger.warning(f"Skipping molecule {mol_id}: missing required files")
             
-            # Log progress every 10% to reduce I/O overhead
+            # Log progress every 10%
             processed_count += 1
             if processed_count % max(1, total_mols // 10) == 0:
                 logger.info(f"Matched files: {processed_count}/{total_mols} ({100*processed_count/total_mols:.1f}%)")
@@ -728,13 +690,13 @@ class BatchProcessor:
         
         # Optimize batch size for CPU cores (32 threads = 16 cores)
         cpu_cores = self._memory_monitor.cpu_count or 16  # Fallback to 16 if unknown
-        # Use batch size that's a multiple of CPU cores for better utilization
+        # Use batch size that's a multiple of CPU cores
         default_batch_size = max(cpu_cores * 4, 128)  # At least 4x cores, minimum 128
         batch_size = get_config_value(self.config, 'settings.batch_size', default_batch_size)
         
         logger.info(f"Processing {total_molecules} molecules in chunks of {batch_size} (CPU cores: {cpu_cores})")
         
-        # Overall progress bar for chunks
+        # Progress bar
         total_chunks = (total_molecules + batch_size - 1) // batch_size
         chunk_progress = tqdm(range(0, total_molecules, batch_size), 
                              desc="Processing chunks", 
@@ -745,7 +707,6 @@ class BatchProcessor:
             chunk = matched_molecules[i:i + batch_size]
             chunk_num = i // batch_size + 1
             
-            # Update chunk progress description with memory info
             memory_stats = self._memory_monitor.get_memory_stats()
             chunk_progress.set_description(f"Chunk {chunk_num}/{total_chunks} (Mem: {memory_stats['current']:.1f}%)")
             
@@ -765,20 +726,8 @@ class BatchProcessor:
         logger.info(f"Processing complete: {self.successful_count} successful, {len(self.failed_molecules)} failed")
         logger.info(f"Memory usage - Start: {final_memory['start']:.1f}%, Peak: {final_memory['peak']:.1f}%, Final: {final_memory['current']:.1f}%")
     
-    # Optimized chunk processing with multiprocessing
     def _process_chunk_optimized(self, molecules_chunk: List[MoleculeData]):
-        """Process a chunk of molecules with multiprocessing to bypass Python GIL."""
-        
-        use_multiprocessing = get_config_value(self.config, 'performance.use_multiprocessing', True)
-        
-        if use_multiprocessing:
-            self._process_chunk_multiprocessing(molecules_chunk)
-        else:
-            self._process_chunk_threading(molecules_chunk)
-    
-    def _process_chunk_multiprocessing(self, molecules_chunk: List[MoleculeData]):
         """Process molecules using multiprocessing to bypass Python GIL for true parallelism."""
-        # Use multiprocessing to bypass Python GIL for true parallelism
         cpu_cores = self._memory_monitor.cpu_count or 16
         
         default_workers = min(cpu_cores // 2, 32) 
@@ -793,10 +742,8 @@ class BatchProcessor:
         
         logger.info(f"Processing {len(molecules_chunk)} molecules with {max_workers} processes (Memory: {current_memory:.1f}%)")
         
-        # Create worker arguments for multiprocessing
         worker_args = []
         for mol_data in molecules_chunk:
-            # Convert to simple dict for multiprocessing (can't pass complex objects)
             mol_dict = {
                 'mol_id': mol_data.mol_id,
                 'xyz': str(mol_data.xyz) if mol_data.xyz else None,
@@ -820,7 +767,6 @@ class BatchProcessor:
             if processed_results:
                 self._save_processed_results_to_database(processed_results)
         else:
-            # Multiprocess
             logger.info(f"Multiprocessing with {max_workers} processes")
             
             start_time = time.time()
@@ -877,36 +823,6 @@ class BatchProcessor:
             else:
                 logger.warning("All molecular graph generation efforts were unsuccessful, nothing to save to database")
     
-    # def _process_chunk_threading(self, molecules_chunk: List[MoleculeData]):
-    #     """Fallback threading approach (limited by Python GIL)."""
-    #     cpu_cores = self._memory_monitor.cpu_count or 16
-    #     max_workers = min(cpu_cores, get_config_value(self.config, 'settings.max_workers', 16))
-        
-    #     logger.info(f"Processing {len(molecules_chunk)} molecules with {max_workers} threads")
-        
-    #     # Process molecules using threading (fallback approach)
-    #     molecular_graphs = []
-        
-    #     def process_single_threaded(mol_data):
-    #         return self._process_single_molecule_return_graph(mol_data)
-        
-    #     # Use ThreadPoolExecutor for fallback
-    #     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-    #         futures = [executor.submit(process_single_threaded, mol_data) 
-    #                   for mol_data in molecules_chunk]
-            
-    #         for future in as_completed(futures):
-    #             try:
-    #                 result = future.result(timeout=300)  # 5 minute timeout per molecule
-    #                 if result:
-    #                     molecular_graphs.append(result)
-    #             except Exception as e:
-    #                 logger.warning(f"Threading error: {e}")
-        
-    #     # Batch save to database
-    #     if molecular_graphs:
-    #         self._batch_save_to_database(molecular_graphs)
-    
     def _save_processed_results_to_database(self, processed_results: List[Dict]):
         """Process results from multiprocessing - database saves already completed in worker functions."""
         if not processed_results:
@@ -915,10 +831,8 @@ class BatchProcessor:
         try:
             start_time = time.time()
             
-            # Count successful saves (molecules are already saved by worker processes)
             successful_count = 0
             for result in processed_results:
-                # Skip error results
                 if result.get('error'):
                     error_info = {
                         'mol_id': result['mol_id'],
@@ -933,7 +847,6 @@ class BatchProcessor:
                     successful_count += 1
                     logger.debug(f"Confirmed database save for {result.get('id', 'unknown')}")
             
-            # Update success count 
             self.successful_count += successful_count
             
             duration = time.time() - start_time
@@ -955,10 +868,8 @@ class BatchProcessor:
             
             graph_type = mol_data.graph_type or self._determine_graph_type_optimized(mol_data)
             
-            # Convert optimized molecule data back to dict for compatibility
             mol_dict = mol_data.to_dict()
             
-            # Generate QM data dictionary with enhanced error handling
             qm_dict = generate_qm_data_dict(
                 mol_id=mol_id,
                 smiles=smiles,
@@ -968,7 +879,6 @@ class BatchProcessor:
                 nbo_output=mol_dict['nbo']
             )
             
-            # Enhanced validation for qm_dict
             if qm_dict is None:
                 logger.warning(f"generate_qm_data_dict returned None for {mol_id} - likely parsing error")
                 return None
@@ -1012,139 +922,6 @@ class BatchProcessor:
                 raise
             
             return None
-    
-    def _batch_save_to_database(self, molecular_graphs: List):
-        """Save multiple molecular graphs to database using individual save method for new schema."""
-        if not molecular_graphs:
-            return
-            
-        database_path = get_database_path(self.config)
-        
-        try:
-            import sqlite3
-            from pathlib import Path
-            
-            start_time = time.time()
-            
-            with sqlite3.connect(database_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='graphs';")
-                graphs_table_exists = cursor.fetchone() is not None
-            
-            if graphs_table_exists:
-                logger.info(f"Using new schema - saving {len(molecular_graphs)} graphs individually")
-                successful_count = 0
-                for graph in molecular_graphs:
-                    try:
-                        graph.save_to_database(database_path)
-                        successful_count += 1
-                    except Exception as e:
-                        logger.warning(f"Failed to save graph {graph.graph_id}: {e}")
-                        continue
-                
-                logger.info(f"Successfully saved {successful_count}/{len(molecular_graphs)} graphs")
-                
-            else:
-                # Error if new schema not available
-                raise RuntimeError("New schema (graphs table) not found. Database must be created with new schema.")
-                
-        except Exception as e:
-            logger.error(f"Database save failed: {e}")
-            raise
-    
-    # def _batch_save_to_database_old_schema(self, molecular_graphs: List):
-    #     """Fallback method for old schema compatibility."""
-    #     database_path = get_config_value(self.config, 'output.database_name', 'molecular_graphs.db')
-    #     if not database_path.endswith('.db'):
-    #         database_path += '.db'
-        
-    #     import sqlite3
-    #     import json
-        
-    #     with sqlite3.connect(database_path) as conn:
-    #         cursor = conn.cursor()
-            
-    #         cursor.execute('''
-    #             CREATE TABLE IF NOT EXISTS molecular_graphs (
-    #                 id TEXT PRIMARY KEY,
-    #                 graph_type TEXT,
-    #                 smiles TEXT,
-    #                 nodes INTEGER,
-    #                 edges INTEGER,
-    #                 node_features INTEGER,
-    #                 edge_features INTEGER,
-    #                 graph_data TEXT
-    #             )
-    #         ''')
-            
-    #         batch_data = []
-    #         for graph in molecular_graphs:
-    #             try:
-    #                 if hasattr(graph.nodes, '__len__'):
-    #                     node_count = len(graph.nodes)
-    #                 elif hasattr(graph, 'node_count'):
-    #                     node_count = graph.node_count
-    #                 else:
-    #                     node_count = 0
-                        
-    #                 if hasattr(graph.edges, '__len__'):
-    #                     edge_count = len(graph.edges)
-    #                 elif hasattr(graph, 'edge_count'):
-    #                     edge_count = graph.edge_count
-    #                 else:
-    #                     edge_count = 0
-                
-    #                 graph_data = {
-    #                     'id': graph.graph_id,
-    #                     'graph_type': graph.graph_type,
-    #                     'smiles': getattr(graph.dict_data, 'smiles', ''),
-    #                     'nodes': node_count,
-    #                     'edges': edge_count,
-    #                     'node_features': len(graph.get_node_features()) if graph.get_node_features() else 0,
-    #                     'edge_features': len(graph.get_edge_features()) if graph.get_edge_features() else 0,
-    #                     'graph_data': graph.dict_data.to_dict() if hasattr(graph.dict_data, 'to_dict') else {}
-    #                 }
-                    
-    #                 batch_data.append((
-    #                     graph_data['id'],
-    #                     graph_data['graph_type'], 
-    #                     graph_data['smiles'],
-    #                     graph_data['nodes'],
-    #                     graph_data['edges'],
-    #                     graph_data['node_features'],
-    #                     graph_data['edge_features'],
-    #                     json.dumps(graph_data['graph_data'], default=str)
-    #                 ))
-    #             except Exception as e:
-    #                 logger.warning(f"Failed to prepare batch data for graph {graph.graph_id}: {e}")
-    #                 continue
-            
-    #         # Batch insert
-    #         cursor.executemany('''
-    #             INSERT INTO molecular_graphs 
-    #             (id, graph_type, smiles, nodes, edges, node_features, edge_features, graph_data)
-    #             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    #         ''', batch_data)
-    #
-    #         conn.commit()
-    #         logger.info(f"Saved {len(batch_data)} graphs using old schema")
-
-    def _preload_molecule_files(self, mol_data: MoleculeData):
-        """Preload file contents for a single molecule in parallel."""
-        try:
-            # Preload all file types for this molecule
-            file_types = ['xyz', 'shermo', 'janpa', 'nbo']
-            for file_type in file_types:
-                file_path = getattr(mol_data, file_type, None)
-                if file_path and Path(file_path).exists():
-                    try:
-                        with open(file_path, 'r') as f:
-                            content = f.read()
-                            mol_data._file_cache[file_type] = content
-                    except Exception as e:
-                        logger.debug(f"Could not preload {file_type} for {mol_data.mol_id}: {e}")
-        except Exception as e:
-            logger.warning(f"Failed to preload files for {mol_data.mol_id}: {e}")
     
     def _cleanup_temp_files(self):
         """Clean up temporary extraction directory if it was created."""
