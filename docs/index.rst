@@ -84,7 +84,7 @@ Citation & license
 ------------
 If you use graphpancake in your research, please cite:
 
-Sil, S., Scheidt, K.A. graphpancake: A Python library to represent organic molecules as molecular graphs using electronic structure theory, ChemRxiv, 2025. DOI: 
+Sil, S., Maskeri, M. A., Scheidt, K.A. 2025. graphpancake: A Python package for representing organic molecules as molecular graphs utilizing electronic structure theory. DOI: 
 
 This work is licensed under the MIT License. See the LICENSE file in the repository root for details.
 
