@@ -1,17 +1,11 @@
 name: graphpancake-docs
 channels:
   - conda-forge
-  - pytorch
-  - pyg
 dependencies:
   - python>=3.8
   - pip
   - pandas
   - numpy
-  - torch
-  - torchvision
-  - torchaudio
-  - pytorch-geometric
   - rdkit
   - networkx
   - matplotlib
@@ -25,6 +19,8 @@ dependencies:
   - setuptools-scm
   - versioningit
   - pip:
+      - torch
+      - torch-geometric
       - sphinx>=4.0
       - sphinx-rtd-theme
       - sphinx-autodoc-typehints
