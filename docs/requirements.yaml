@@ -1,43 +1,34 @@
-name: docs_graphpancake
+name: graphpancake-docs
 channels:
   - conda-forge
-  - defaults
-
+  - pytorch
+  - pyg
 dependencies:
-  # Base Python environment
   - python>=3.8
   - pip
-
-  # Sphinx and documentation dependencies
-  - sphinx>=4.0
-  - pydata-sphinx-theme
-  - sphinx-design
-  - sphinx-copybutton
-  - sphinx-autoapi
-  - myst-parser
-
-  # Core Python dependencies from pyproject.toml
   - pandas
   - numpy
   - torch
-  - torch-geometric
-  - networkx
-  - plotly
-  - matplotlib
-  - pyyaml
+  - torchvision
+  - torchaudio
+  - pytorch-geometric
   - rdkit
-  - regex
+  - networkx
+  - matplotlib
+  - plotly
+  - pyyaml
   - tqdm
   - psutil
-  - importlib-resources  # Only needed for Python <3.10
-
-  # Build tools
+  - regex
+  - sqlite
   - setuptools
-  - wheel
+  - setuptools-scm
   - versioningit
-
   - pip:
-    - -e ../
-    # Optional/extra packages
-    - polars
+      - sphinx>=4.0
+      - sphinx-rtd-theme
+      - sphinx-autodoc-typehints
+      - sphinx-design
+      - myst-parser
+      - shibuya
 
