@@ -14,7 +14,6 @@ dependencies:
   - tqdm
   - psutil
   - regex
-  - sqlite
   - setuptools
   - setuptools-scm
   - versioningit

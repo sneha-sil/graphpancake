@@ -32,7 +32,6 @@ dependencies = [
     "regex",
     "tqdm",
     "psutil",
-    "sqlite",
     "importlib-resources; python_version<'3.10'",
 ]
 
