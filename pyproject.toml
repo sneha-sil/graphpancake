@@ -52,6 +52,7 @@ docs = [
   "sphinx-rtd-theme",
   "sphinx-autodoc-typehints",
   "sphinx-design",
+  "sphinx-copybutton",
   "myst-parser",
   "shibuya",
 ]
