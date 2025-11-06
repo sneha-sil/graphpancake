@@ -49,8 +49,12 @@ test = [
   "pytest>=6.1.2",
 ]
 docs = [
-  "sphinx",
-  "sphinx_rtd_theme",
+  "sphinx>=4.0",
+  "sphinx-rtd-theme",
+  "sphinx-autodoc-typehints",
+  "sphinx-design",
+  "myst-parser",
+  "shibuya",
 ]
 
 [tool.setuptools]
