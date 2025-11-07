@@ -82,7 +82,9 @@ https://graphpancake.readthedocs.io/
 
 If you use `graphpancake` in your research, please cite this repository and the relevant references above.
 
-Sil, S., Maskeri, M. A., Scheidt, K.A. 2025. graphpancake: A Python package for representing organic molecules as molecular graphs utilizing electronic structure theory. DOI: 
+Sil, S., Maskeri, M. A., Scheidt, K.A. 2025. graphpancake: A Python package for representing organic molecules as molecular graphs utilizing electronic structure theory.
+
+**DOI:** [10.5281/zenodo.17553385](https://doi.org/10.5281/zenodo.17553385)
 
 ---
 
