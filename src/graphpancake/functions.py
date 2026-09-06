@@ -1,4 +1,5 @@
 from rdkit import Chem
+from rdkit.Chem import Descriptors
 import numpy as np
 import regex as re
 import mmap
