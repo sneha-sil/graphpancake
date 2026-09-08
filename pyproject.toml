@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "graphpancake"
 description = "A Python library for generating molecular graphs of small organic molecules (elements H, B, C, N, O, F, Si, P, S, Cl, Br, I) from electronic structure theory (i.e., DFT and WFT quantum chemistry calculations)"
-dynamic = ["version"]
+version = "1.0.1"
 readme = "README.md"
 authors = [
     { name = "Sneha Sil", email = "snehasil2029@u.northwestern.edu" }
